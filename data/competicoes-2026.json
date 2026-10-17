@@ -1,0 +1,82 @@
+{
+  "_sobre": "Formato real de 2026 de cada competição e como ela vira linhas de CompetitionRegulation.bin. 'confirmar' marca o que ainda precisa ser checado no regulamento da CBF.",
+  "temporada": 2026,
+  "competicoes": [
+    {
+      "id": "serie-a",
+      "nome": "Campeonato Brasileiro Série A",
+      "clubes": 20,
+      "fases": [
+        {"nome": "Pontos corridos", "tipo": "liga", "times": 20, "turnos": 2}
+      ],
+      "rebaixados": 4,
+      "rebaixa_para": "serie-b"
+    },
+    {
+      "id": "serie-b",
+      "nome": "Campeonato Brasileiro Série B",
+      "clubes": 20,
+      "fases": [
+        {"nome": "Pontos corridos", "tipo": "liga", "times": 20, "turnos": 2}
+      ],
+      "promovidos": 4,
+      "rebaixados": 4,
+      "sobe_para": "serie-a",
+      "rebaixa_para": "serie-c",
+      "confirmar": ["número de acessos e rebaixamentos em 2026"]
+    },
+    {
+      "id": "serie-c",
+      "nome": "Campeonato Brasileiro Série C",
+      "clubes": 20,
+      "fases": [
+        {"nome": "Primeira fase", "tipo": "liga", "times": 20, "turnos": 1, "avancam": 8, "rebaixados": 2},
+        {"nome": "Segunda fase", "tipo": "grupos", "times": 8, "grupos": 2, "times_por_grupo": 4, "turnos": 2, "avancam_por_grupo": 2, "sobem": "2 primeiros de cada grupo"},
+        {"nome": "Final", "tipo": "mata-mata", "times": 2, "jogos": 2}
+      ],
+      "promovidos": 4,
+      "rebaixados": 2,
+      "sobe_para": "serie-b",
+      "rebaixa_para": "serie-d",
+      "confirmar": ["formato da final (ida e volta)"]
+    },
+    {
+      "id": "serie-d",
+      "nome": "Campeonato Brasileiro Série D",
+      "clubes": 96,
+      "fases": [
+        {"nome": "Primeira fase", "tipo": "grupos", "times": 96, "grupos": 16, "times_por_grupo": 6, "turnos": 2, "avancam_por_grupo": 4},
+        {"nome": "Segunda fase", "tipo": "mata-mata", "times": 64, "jogos": 2},
+        {"nome": "Terceira fase", "tipo": "mata-mata", "times": 32, "jogos": 2},
+        {"nome": "Oitavas", "tipo": "mata-mata", "times": 16, "jogos": 2},
+        {"nome": "Quartas", "tipo": "mata-mata", "times": 8, "jogos": 2, "sobem": "4 vencedores"},
+        {"nome": "Playoff de acesso", "tipo": "mata-mata", "times": 4, "jogos": 2, "sobem": "2 vencedores, entre os eliminados das quartas"},
+        {"nome": "Semifinal", "tipo": "mata-mata", "times": 4, "jogos": 2},
+        {"nome": "Final", "tipo": "mata-mata", "times": 2, "jogos": 2}
+      ],
+      "promovidos": 6,
+      "sobe_para": "serie-c",
+      "vagas_de_entrada": "estaduais e copas estaduais + rebaixados da Série C",
+      "limite_do_motor": "96 e 64 times passam do máximo de 63 por fase",
+      "confirmar": ["turno e returno nos grupos", "formato do playoff", "segunda fase em ida e volta"]
+    },
+    {
+      "id": "copa-do-brasil",
+      "nome": "Copa do Brasil",
+      "clubes": 126,
+      "fases": [
+        {"nome": "1ª fase", "tipo": "mata-mata", "times": 28, "jogos": 1},
+        {"nome": "2ª fase", "tipo": "mata-mata", "times": 88, "jogos": 1, "entram": "14 vencedores da 1ª fase + 74 clubes"},
+        {"nome": "3ª fase", "tipo": "mata-mata", "jogos": 1, "entram": "campeões da Copa Verde, Copa do Nordeste, Série C e Série D"},
+        {"nome": "4ª fase", "tipo": "mata-mata", "jogos": 1},
+        {"nome": "5ª fase", "tipo": "mata-mata", "jogos": 2, "entram": "clubes da Série A"},
+        {"nome": "Oitavas", "tipo": "mata-mata", "times": 16, "jogos": 2},
+        {"nome": "Quartas", "tipo": "mata-mata", "times": 8, "jogos": 2},
+        {"nome": "Semifinal", "tipo": "mata-mata", "times": 4, "jogos": 2},
+        {"nome": "Final", "tipo": "mata-mata", "times": 2, "jogos": 1, "data": "2026-12-06"}
+      ],
+      "limite_do_motor": "a 2ª fase (88) passa do máximo de 63 por fase",
+      "confirmar": ["número de clubes na 3ª, 4ª e 5ª fases", "vantagem do empate nas fases de jogo único"]
+    }
+  ]
+}

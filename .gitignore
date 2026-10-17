@@ -1,0 +1,7 @@
+# Elencos e bancos de terceiros (NewLife Database, exports do Mod Studio)
+elencos/
+*.fl26pack
+FL26_Updated_Transfers/
+# Saves e arquivos do jogo
+*00000000
+*.cpk
