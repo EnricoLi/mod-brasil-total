@@ -1,0 +1,366 @@
+# FL26 Mod Studio — how it works
+
+The user guide is [mod-studio-guide.md](../../guides/en/mod-studio-guide.md) ([hrvatski](../../guides/hr/mod-studio-guide.md),
+[español](../../guides/es/mod-studio-guide.md), [português](../../guides/pt/mod-studio-guide.md),
+[français](../../guides/fr/mod-studio-guide.md)).
+This page is for modders and developers: what the program does to the game folder, and the
+league package format.
+
+## What it touches
+
+| Where | What |
+|---|---|
+| `SiderAddons\sider.ini` | `cpk.root` and `lua.module` lines (switched off by commenting, never deleted), and the settings some modules need. |
+| `SiderAddons\livecpk\<folder>` | Content folders it installs; League Builder worlds (`_FL26...`). |
+| `SiderAddons\modules` | Lua modules it installs; the League Builder's modules. |
+| `SiderAddons\content\<server>` | Content server files and their map files. |
+| `SiderAddons\ModStudio\` | `backups\` (a copy of every file before it is changed, one folder per day, with an index), `profiles\`, `installed.json` (what each installed mod added and replaced). |
+| `%APPDATA%\FL26ModStudio` | The program's settings, the unpacked game tables, and the store of added league packages. |
+
+The game's own files (`download\*.cpk`, the exe) are only read.
+
+Updates (`updater.py`): the check reads the public repository's releases
+(`api.github.com/repos/Matozanato/FootballLife-new-leagues/releases`, tags `modstudio-<version>`)
+and nothing else is sent. The zip is checked against the sha256 GitHub lists for the asset and
+against its size, unpacked to `%TEMP%`, and a batch file copies it over the program's folder once
+the program has exited (both processes of the one-file .exe), then starts it again. It writes
+`%TEMP%\FL26ModStudio-update.log`.
+
+## Source
+
+`tools/modstudio/`; the window is `app.py`, one file per page in `pages/`.
+
+| File | Job |
+|---|---|
+| `siderini.py` | Reads and writes `sider.ini` keeping comments, blank lines and order. |
+| `roots.py`, `modules.py` | Content folders and modules: what is in them, the known module order, settings a module needs. |
+| `servers.py`, `mapfile.py` | The content servers: where their content and map files are, the columns of each map, a map file read and written as rows. |
+| `installer.py` | Looks inside a mod, says what each part is, installs it, merges map files, records what it did so it can be removed. |
+| `backups.py`, `profiles.py` | Restore points and profiles. |
+| `checks.py` | The checks behind Overview and Diagnostics. |
+| `updater.py` | Help → Check for updates: the newest `modstudio-<version>` release, download, checksum, the swap after the program exits. |
+| `credits.py` | The Credits window next to Help: everyone who helped. A new name goes here and into the README's credits together. |
+| `project.py` | The League Builder recipe. The build itself is `tools/leaguebuilder.py`. |
+| `lbplayers.py`, `lbfaces.py`, `lbpackage.py` | Player changes, faces, league packages (`tools/`). |
+
+## The world file: `SiderAddons\modules\fl26world.txt`
+
+The League Builder's worlds are read by the Sider modules in its pack (`sider/` and
+`sider/experimental/`, installed by Build → *0. Install the modules*). They learn which leagues
+a world has from one plain text file, written at Build and copied to `modules\` by *Switch it
+on*. A module that finds no file keeps its built-in list, so an install without the builder
+behaves exactly as before.
+
+The pack (`tools/lbpack.py`) ships the small guards as two bundles since 0.2.0: `fl26guards.lua`
+(fl26nullguard, 2, 4, 5, 7, 8, 9, 10, in that order) and `fl26lateguards.lua` (fl26superguard,
+fl26resultsguard, fl26ctlguard, fl26kitguard). Each part runs in its own function with its own
+locals and log lines, and the bundle's init calls the parts' inits in order. Sider's Lua has no
+`pcall`, so a part whose init raises an error stops the parts after it; the oldest, most tried
+guards come first. The pack's `retired.txt` names the single modules; install switches their
+`lua.module` lines off and moves their files to `modules\before-builder-<n>`, so a fix is never
+applied twice.
+
+Every line kind, with the code that writes it and the modules that read it, is listed in
+[fork/world-file.md](fork/world-file.md); the kinds below are the ones that need the most
+explaining.
+
+```
+# fl26world 1
+world _FL26Example
+league 11 cid=130 region=60 country=198 slot=3 tier=1 promote=0 demote=2 clubs=12 legs=3 name=First League
+league 49 cid=131 region=60 country=198 slot=2 tier=2 above=11 promote=2 demote=0 clubs=16 legs=2 name=Second League
+```
+
+- `league <regulation id>` then `key=value` pairs; `name=` is last and takes the rest of the line.
+- `slot` = Select Team slot (absent or 123 = none). `country` = Country.bin id (flag,
+  Competition Info name). `above` = the league one division up (shipped or new).
+  `promote` / `demote` = how many clubs go up from / down out of this league.
+- `cup` = the country's domestic cup, written on a second division added under a shipped top
+  flight that had none (Germany, Russia, ...). The game fills a country's cup from its first
+  league and the league below it, so without this the new second division would take the cup
+  over or join it. fl26chain keeps the cup to the top flight's clubs (issue #21). Build also
+  writes it on the second division under a new country's top flight when the two together are
+  more than a cup can take (44 clubs), so the cup keeps the top division alone.
+- `cupall=1` (with `cup`): the shipped country's cup takes **both** divisions, the top one's
+  clubs first (issue #32: the DFB-Pokal with a new 2. Bundesliga). Build writes it when the
+  cup's calendar dates every round of that field and the field is at most 44 clubs, and raises
+  the cup's bracket to that size in the world's tables; otherwise, or with `"cup_top_only": true`
+  on the league in the recipe, the cup keeps the top flight's clubs only (plain `cup`).
+- `cupn=<clubs>` (with `cup`): the most clubs the cup takes (issue #74). The cup's bracket
+  screen draws a field of 32 or fewer only for 2 to 16, 18, 20, 24, 28 or 30 clubs, so a new
+  country's national cup of, say, 10 + 12 clubs is written as `cup=<its regulation> cuptop=<top
+  division> cuplow=<the one below, 0 if none> cupall=1 cupn=20` on the top division's line, and
+  fl26chain gives the cup the top division and the first clubs of the one below, 20 in all.
+- `nopool <team id> <team id> ...`: clubs the game already has that now play in a league of
+  the world (the recipe's `game_clubs`), and the clubs that took their league places.
+  fl26clubs.dll (`fl26_clubs_keep_out`) leaves them out of the Master League's *Other ...
+  clubs* groups, so a club does not show twice.
+- Unknown keys are ignored, so later versions can add fields without breaking older modules.
+- A split league is one `league` line for the regular phase plus
+  `split <total> regular=<id> groups=<id>,<id>`.
+- `uefa <regulation> <position> <competition> <alt>`: one European place per line, in
+  hand-out order. Position 0 is a cup winner: `<regulation>` is the cup, `<alt>` the league
+  whose next club without a place takes it when the winner already has one (a recipe's
+  `europe` position 0, 0.1.7). Without any, fl26swiss uses the DLL's own list (shipped leagues only).
+  Competitions: 0 Champions League, 1 Europa League, 2 Conference League, 3 Libertadores,
+  4 Libertadores qualifying, 5 AFC Champions League, and the seven cups the game does not have:
+  6 CAF Champions League, 7 CAF Confederation Cup, 8 AFC Champions League Two, 9 Copa
+  Sudamericana, 13 CONCACAF Champions Cup, 14 OFC Champions League, 15 AFC Challenge League
+  (0.2.0; places in these go to `ccup` lines, not `uefa` ones), and the August play-offs:
+  10 Champions League qualifying (regulation 2), 11 Europa League qualifying (188), 12
+  Conference League qualifying (189). A list replaces the DLL's, so Build writes
+  the shipped leagues' places first (`fl26world.SHIPPED_ACCESS`, a copy of fl26swiss.c's
+  ACCESS) and then the places of the recipe's leagues (their `europe` key, set in the League
+  dialog). Each competition takes 36 clubs; places past the 36th get nothing. A list with any
+  competition 10, 11 or 12 place switches that play-off on; each takes 8 off the direct entrants
+  of the competitions its winners and losers go to (with all three: 28 / 20 / 20). In front of
+  the play-offs Build can add a third and a second qualifying round per competition (0.1.7):
+  `fl26world.pick_rounds` takes the first set of `QCONFIGS` whose new clubs the listed places
+  fill (all nine rounds need 32 / 16 / 16 qualifying clubs, 132 places in Europe; the shipped
+  places alone give the play-offs), `mkeuropo.qualifying` copies regulation 2 and its eight ties
+  for each round under free ids (197 up, before the cups), and the world file names them as
+  `qround <10|11|12> <3|2> <regulation>` lines (fl26swiss.lua -> `fl26_swiss_qrounds`). A round
+  takes 16 less 8 for every round feeding it; winners go to the next round of their
+  competition, losers of a play-off to the league phase below, of a third / second round to the
+  next competition's play-off / third round (out when it is missing, and always from the
+  Conference League). Legs: second round days 220/225, third 229/236, play-off 243/250 (the
+  Champions League's 244/251). fl26swiss fills, starts and registers each round on the days
+  between the round before it and its first leg (second round 217-219, third 226-228, play-off
+  237-242, the Champions League's 237-243; without qualifying rounds regulation 2 from day 205
+  in a career's first summer and 188/189 from day 217), from the list's clubs and the earlier
+  rounds' results; an unplayed round passes its seeded clubs on. From the second season
+  regulation 2's rollover clubs are replaced by the list's (with a Champions League third round,
+  regulation 2 is left empty at the rollover and filled in August). The list's places fill the
+  play-off first, then the third round, then the second. A competition's places past its direct
+  entrants spill into its own qualifying ahead of the shipped qualifying places. The recipe's `game_europe` drops the shipped places of the named game leagues (`replace` in
+  `fl26world.uefa_places`) and lists its own under the regulation the access list uses (the
+  split leagues' phase: Scotland 134, Belgium 155, Denmark 147).
+- `game_cups` in the recipe: fl26swiss home cups (`ccup`) for the game's own top divisions,
+  the same as a new country's league cup and super cup; codes `FL_G<reg>_LCUP` and
+  `FL_G<reg>_SCUP`.
+- Single-match league cup (0.2.0, `leaguebuilder.league_ko_cup`): the top division and the one
+  below, cut to the largest bracket size up to 44 (`LEAGUE_KO_SIZES`). mkccup copies the
+  knockout row from reg 23 (the FA Cup: format 2, one match a round) with its bracket set to
+  the field (`--cup` 10th field `like`). World file: `ccup <reg> ... fill=253 national=1
+  days=265,279,300,321,335,356 like=23 draw=byes`, no `lpre`. fl26swiss names it with the new
+  export `fl26_swiss_ccup_like` (lua calls it before `fl26_swiss_ccup`), takes it only when the
+  live row is format 2 with bracket = field (`ccup_like_ok`), dates it by borrowing reg 23's
+  calendar and moving round k to `days[k]` (`ccup_like_dates`), and the cup draw mode 3
+  (`byes`) gives the byes to the top division and draws the rest at random. An older career
+  (format 30 row) falls back to the old two-legged knockout of the largest power of two on the
+  old days; an old world keeps its old lines. Where the old cup had a pre-round, its regulation
+  id is still taken (`reserve`), so every later cup keeps its id.
+- League cup pre-round (0.1.7, worlds built before 0.2.0): the clubs past 16, 8 or 4 (`leaguebuilder.cup_field`, at most
+  eight ties) play a two-legged pre-round on days 246/249 -- a copy of reg 2 under a free id
+  (`mkeuropo.prerounds`, master + 8 tie rows, the cup's competition id), written before
+  mkccup so the cup's `<tie>:0` entries resolve. World file: `lpre <reg> cup=<ko> fill=226
+  days=246,249 entry=...`, tie k = entries 2k (home first) and 2k+1. fl26swiss fills it like an
+  August round (`lpre_fill`), dates it from reg 2's records, tears it down in July; the cup
+  (fill=253) takes each tie's winner (`lpre_winner`, the better placed club when unplayed) and
+  skips the pre-round's clubs for its direct places.
+- Libertadores qualifying (4) places of new leagues: the round (regulation 8) is set on day 0
+  with shipped clubs only, none of them from the pool slot 73 that the other places replace. So
+  fl26swiss.c `cont_standins` gives each of our places the place of a shipped club: the last
+  listed one of the country with the most clubs in the round, at most half the round; the
+  round's ties (1032 ... 4104) follow the same map. sider.log: `... in place of <team> (slot ...)`.
+- `season <region> <type>`: the region's season type, in front of the game's own table
+  (0x141576140: 0 August-May, 1 January-December; a region it has not got plays August-May).
+  fl26join.dll hooks that function (`fl26_join_season_types`, fl26join.log "season types from
+  the world file"); fl26joindll.lua and fl26swiss.lua take the leagues of a type-1 region for
+  calendar-year ones (registration, New Year promotion, round dates 45..333). Build writes
+  `season <region> 1` for a new country whose top division has *February to December*
+  (recipe `"season": "calendar"`). `season <region> 0` for a calendar-year country of the game
+  is EXPERIMENTAL (0.2.0, recipe `game_seasons`, Mod Studio's *Seasons of the game's leagues*;
+  the older `saudi_august` is Saudi Arabia): Brazil 16 (29, 163), Chile 18 (67), China 21 (120),
+  Japan 24 (52) and Saudi Arabia 28 (162) then play August-May. Their cups get `dates ... like=`
+  lines of an August-May cup of the same bracket (China 127 and Saudi 164 the Belgian cup, Japan
+  55 the English one, the super cups 97/132/165 the Belgian super cup; Brazil's and Chile's are on
+  the English cup's calendar already), and fl26swiss spreads the leagues' rounds over a European
+  season (`fl26_swiss_european`, `SHIPPED_REGION_LEAGUES`). Colombia and the USA (Apertura and
+  Clausura) cannot move.
+- `uecl <id> <id> ...`: the Conference League's 36 entrants at the start, written when the
+  recipe's `uecl` is on (the default). Build then reshapes the Champions League and the Europa
+  League to a league phase of 36 (mkreshape), clones FL_UECL as competition 174 with
+  regulations 186 (league phase, group 1210) and 187 (knockout) (`mkuecl.build`), and adds the
+  play-offs 188/189 (`mkeuropo.build`). fl26swiss.lua does not read this line yet; it uses
+  its own UECL list, the same clubs on the game's own tables.
+- The league-phase draw (all three competitions) keeps associations apart, as UEFA does: no
+  club meets a club of its own country, and none meets more than two of any one other country.
+  A club's country is its league's: the `country=` of a league line of the world file for a
+  league of ours (fl26swiss.lua hands the DLL `slot, country` pairs, `fl26_swiss_nations`),
+  else the game's own. See [league-phase-swiss-decode.md](../research/league-phase-swiss-decode.md),
+  section 13.
+
+- `ccup <groups regulation> ko=<knockout regulation> groups=<n> entry=<reg>:<position>,... name=<text>`:
+  a continental cup of the seven above, built by `tools/mkccup.py` into the world's tables and
+  run by fl26swiss.dll: filled at the end of August from the leagues' tables (a club already in
+  another of these cups, or in the game's own Libertadores (regulation 9), its qualifying round
+  (8) or the AFC Champions League (15), is skipped), drawn into groups of four, then a knockout
+  of 2 x groups clubs. `groups=0` is a straight knockout (then both regulations are the same).
+  Build sizes each cup to 32, 16, 8 or 4 clubs: the recipe's places first, and for AFC Champions
+  League Two, the AFC Challenge League, the Copa Sudamericana and the CONCACAF Champions Cup the
+  shipped leagues of that continent fill the rest (MLS, regulation 51, positions 1-12 for the
+  CONCACAF one; J1 League 11th-14th, Chinese Super League 10th-13th and Saudi Pro League
+  11th-14th for the AFC Challenge League, the AFC's third cup, below Champions League Two). The
+  CONCACAF Champions Cup is always a straight knockout, 16 clubs at most
+  (`fl26world.CCUP_KNOCKOUT`), as the real one is; a knockout's pairs are the strongest against
+  the weakest, swapped where that keeps two clubs of one league apart in the first round. A
+  CAF or OFC cup with fewer than 4 places (the game has no leagues there to fill it from) first takes
+  the best places of the next CAF cup (the CAF Champions League takes all four of two plus two),
+  then the next positions of its own leagues that no place claims; the plan says so in a NOTE.
+  An entry `<reg>:0` is the winner of that cup (kept from its final in the spring, sent in
+  July): Build's CAF Super Cup is `groups=0` with `entry=<CAF CL ko>:0,<CAF CC ko>:0`, filled
+  at the July teardown (day 181-183) and played in late July (recipe `"caf_super_cup": false`
+  leaves it out).
+  `alt=<entry>:<league>:<from>,...` (0.2.0, #95): entry number `<entry>` (0-based) is a national
+  cup's winner -- a recipe place at position 0 in one of these cups -- and `<league>` is where its
+  place goes when there is no winner to send: a new career, a winner already in this cup or in
+  another continental one. fl26swiss then takes the best club of that league not playing yet,
+  from position `<from>` down, as for a UEFA cup winner's place (`fl26_swiss_ccup_alt`). Build
+  writes `<from>` as the first position no competition takes: past a new league's European
+  places, or for a league of the game, where its places in the game's lower cups begin (J1 5th,
+  so its champion stays with the Champions League Elite). Without `:<from>` it starts at 1st. A world file has up to 16 `ccup`
+  lines, continental, league and pre-season cups together (8 before 0.2.0).
+- `confed <flag>:<code>,...` (0.2.0): every country's confederation from `Country.bin` +5 (2 UEFA,
+  3 AFC, 4 CONMEBOL, 5 CAF, 6 CONCACAF, 7 OFC), written when the world has continental cups of
+  its own. In a world without the 32-club Club World Cup, the champion of each of those cups
+  takes the place of the first entrant of its own confederation in the game's Club World Cup
+  (`fl26_swiss_confed`), or of the last entrant when none of its confederation is offered;
+  without the line it is an African entrant, as before 0.2.0.
+
+- `kickorder <regulation>:<place>,...` (0.2.0): written when the recipe has a `country_order`
+  (Mod Studio's League order: `"az"`, or a list of country names). Each league of the Kick Off /
+  Edit list -- the game's, by one regulation per slot, and the world's -- with its country's
+  place. fl26comptab puts those slots together, in place order, where the first of them was,
+  a country's leagues in the order they had, and every other slot after them in its own order.
+  The same order goes into the `order` line (Select Team's regions), with the club
+  competitions still first and the "other" groups and Classic Teams after the countries.
+
+A new country's own cup is not a line: with `"cup": true` on a top division (and optionally
+`"supercup": true`) Build copies a shipped cup (`tools/mkcup.py --like`) into the country's
+region, and a super cup from the Belgian one. The game fills a country's cup with its top
+division and the one below it. A shipped cup of exactly that many clubs is copied when there is
+one (12, 16, 18, 20 for a top division alone; 36, 40, 44 with the one below); any other field up
+to 44 clubs gets the English cup, whose calendar dates every round of a field of 9 to 64 clubs,
+and the game's own byes handle a field that is not a power of two. Past 44 the cup keeps the top
+division alone (`cup` on the second division's line). `"club_coaches"` in a league gives its new
+clubs' managers names (empty = a first name and a surname of two players of the club's country,
+the same at every Build, or `FL Mnnnn` when the game has fewer than 8 of them).
+
+Other recipe keys of Mod Studio 0.1.4 (the full list is the docstring of `tools/leaguebuilder.py`
+and `tools/lbplayers.py`):
+
+- `"game_clubs": [{"at": <place>, "id": <team id>, "swap": ...}]` on a league: clubs the game
+  already has in places of the new league. A club that plays anywhere in the game needs `swap`,
+  the club that takes all its places there (a team id of a club of the game in no competition,
+  or `{"name": ...}` for a new club), so no competition of the game changes its number of clubs.
+  National teams, the special teams and squads under 18 are refused. Written to the world file
+  as `nopool`.
+- `"club_ids": [<id or "">, ...]` on a league: a new club's team id instead of the next free
+  one, above the game's clubs and at most 81919 (the block whose kits are named
+  `<id-65536>_ACL_`).
+- `"season": "calendar"` on a new country's top division: `season <region> 1` (above).
+- `"formation"` / `"club_formations"` on a league: the new clubs' formation, copied from a club
+  of the game with that shape (`tools/mktactics.py`).
+- Under `"players"`, per club: `"join"` (players who come to the club and keep their record: a
+  transfer to a club, a call-up to a national team), `"id"` (a new player's own id, up to
+  399999) and `"coach_portrait"` (a picture Build writes to
+  `common/render/symbol/coach/coach_<coach id>.png`, 256 x 256), and `"stadium"`
+  (`{"folder": "Region\Stadium", "slot": "009", "name": ...}`, a folder of Stadium Server's
+  library: Switch on writes it to `content/stadium-server/map_teams.txt` with the club's built
+  id, `tools/lbstadiums.py`; 0.1.7).
+- `"edits"` / `"swaps"`: `[[team id, team id], ...]`, two clubs of the game's leagues that trade
+  every CompetitionEntry row (league, cups, continental), so no competition changes size
+  (`leaguebuilder.swap_problems`, `exchange_entries`; 0.1.7).
+- A recipe with no leagues and `"uecl"`: the new European format alone, the game's leagues and
+  clubs as they are (Build page, *Only the new European cups...*).
+
+Overview and Diagnostics warn when the world that is on has new leagues but no `uefa` line
+names one of them, and when its Conference League is on but regulations 186/187/1210 are
+missing from its tables.
+
+The builder also keeps a copy in the world folder (`livecpk\<world>\fl26world.txt`).
+
+## New African and Asian leagues: continent (research, not fixed yet)
+
+Reported for an Egyptian league (0.1.3): the Master League board asks for the Copa
+Libertadores, League Info says "South American based leagues" and shows no CAF cups, and
+Select Team lists it after the Asian leagues. What the exe shows, read statically:
+
+- The confederation code (Competition.bin +6, low three bits: 2 UEFA, 3 AFC, 4 CONMEBOL,
+  5 CAF, 6 CONCACAF, 7 OFC) becomes a runtime code through 0x14297d270 (UEFA 1, AFC 2,
+  CONCACAF 3, CONMEBOL 5, CAF 6, OFC 0; bits 25..28 of the row's +0x300).
+- 0x141511070 turns a regulation into a continent (it follows +0x76 first): UEFA 0 Europe,
+  CONMEBOL 1 South America, AFC/OFC 2 Asia, CONCACAF 5, CAF 4, anything else 6. It has 19
+  callers, and most of them only know 0, 1 and 2: 0x14154f4f0 (the month window) is always
+  false for 4; 0x14133ebb1 maps 0/1/2 to regulations 4/10/16 and nothing else; the Master
+  League function at 0x141fc5890 gives 0/1/2 the labels 0x1c/0x1d/0x1e and every other
+  continent none. An African league therefore reaches code paths the shipped game never takes.
+- The season-end filter 0x141365c50 runs only for UEFA, AFC and CONMEBOL (callers
+  0x1413663b8, 0x141366178, 0x141366508), so a CAF-, CONCACAF- or OFC-coded league with a
+  league below it would promote nobody. This is why the builder keeps the UEFA code for such
+  a top division (`build`: "except a league of our own regions ... with a league below it").
+  That league then reads as European to every caller above.
+- Select Team slots 28..40 are the South American block of the parameter table. Regulation 60,
+  the third id the builder hands out, sits on slot 40 (fl26world.DEFAULT_SLOT). A league there
+  is a candidate for the South American wording. This is not confirmed: no reader of the slot's
+  kind was found.
+- The CAF cups' League Info icons already follow the world's `conf=` (fl26catlist ICONS
+  stub). The cups show only when they are built, which needs 4 places or more.
+- Select Team: the game has no African block. The `order` line puts CAF countries in a block of
+  their own after Asia. That is by design.
+
+To look at in game, on a world with an Egyptian league on regulation 60 and one on 173
+(slot 43):
+- the board objective and League Info title of both;
+- sider.log `fl26catlist: League Info icons ... 60=6`.
+
+If only the one on slot 40 is South American, the fix is to hand African and Asian countries
+ids outside slots 28..40 in plan(). If both are, the text comes from the continent. The fix is
+then a continent override for our regions in 0x141511070, or the real code for the top division
+together with a hook on the filter's compare at 0x141365d0e.
+
+## League packages (`.fl26pack`)
+
+A package is a zip with:
+
+```
+manifest.json    {"format": "fl26pack", "format_version": 1, "name", "author", "version",
+                  "description", "made_with", "leagues": [{"name", "country", "clubs"}],
+                  "clubs", "faces", "players", "parts", "edits": {"leagues", "clubs"}, "player_changes"}
+recipe.json      the leagues as a recipe has them, the player changes of their clubs, and
+                 optionally changes to the game's own leagues, clubs and players
+assets/...       the logos, crests and country flags used
+faces/<n>/...    faces given to players (#Win, sourceimages, portrait.dds)
+```
+
+- Paths in `recipe.json` are relative to the package.
+- `"parts"` (0.1.8) lists what went in, of squads, faces, crests, managers, kits, stadiums
+  (export `--without <part>`, again for more; Make a package has a box for each).
+- `"players": false` (no squads; export `--no-players` or `--without squads`): no player changes inside, only crests,
+  managers, league pictures and stadiums. Added to a recipe that already has a league of the
+  same name, it goes onto that league (`lbpackage.overlay`), matching clubs by name, instead of
+  being added beside it; removing the package puts the old values back.
+- A package carries **no ids**. Club, player and league ids depend on what else a person's game
+  already has, so they are given out when that person builds. That is what lets two packages
+  and a person's own leagues live side by side.
+- Players of a new club are addressed as `<league>/<k>` (the club's place in its league) and
+  by their place in the squad; players of the game's clubs by their game id.
+- Adding a package records under `"packs"` in the recipe what came from it, and what a
+  changed game club looked like before, so removing it takes out exactly that.
+
+## Faces
+
+A face is `#Win\face.fpk` (+ `face.fpkd`), `sourceimages\#windx11\*.ftex` and optionally a
+portrait `.dds`. The id of the player the face was made for appears only inside `face.fpk`, as
+the folder of its textures: `/Assets/pes16/model/character/face/real/<id>/sourceimages/`.
+
+At build the face is copied to `Asset\model\character\face\real\<player>\` of the world and that
+path is rewritten to the new place of the textures, **with the same length**, so nothing else in
+the file moves:
+
+- if the new player id has as many digits as the old one, the textures go under the new id;
+- otherwise they go under a folder `m` + a number in base 36, padded to the old id's length
+  (`m0000`, `m0001` ...). No player id has a letter, so these never clash with a real face.
+
+The portrait goes to `common\render\symbol\player\<player>.dds`.
