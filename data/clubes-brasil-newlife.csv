@@ -1,0 +1,124 @@
+serie,clube,newlife_id,ja_no_jogo,jogadores
+A,Athletico Paranaense,1930,1,65
+A,Atlético Mineiro,1245,1,63
+A,Botafogo,1246,1,56
+A,Chapecoense,4108,1,59
+A,Clube do Remo,5145,1,36
+A,Corinthians,1247,1,66
+A,Coritiba,1931,1,47
+A,Cruzeiro,274,1,51
+A,Esporte Clube Bahia SAF,2453,1,52
+A,Esporte Clube Vitória,1937,1,68
+A,Flamengo,1248,1,55
+A,Fluminense Football Club,1249,1,65
+A,Grêmio,1250,1,52
+A,Mirassol Futebol Clube,5767,1,40
+A,Palmeiras,137,1,62
+A,Red Bull Bragantino,2459,1,63
+A,Santos Futebol Clube,1254,1,72
+A,Sport Club Internacional,1252,1,59
+A,São Paulo Futebol Clube,1255,1,88
+A,Vasco,136,1,62
+B,América Futebol Clube SAF (MG),2450,1,50
+B,Athletic Club SAF (MG),5973,1,53
+B,Atlético Goianiense,2451,1,44
+B,Avaí Futebol Clube,98493,0,52
+B,Botafogo Futebol Clube (SP),98849,0,48
+B,Ceará Sporting Club,2454,1,48
+B,Clube Náutico Capibaribe,104670,0,43
+B,Clube de Regatas Brasil,2506,1,45
+B,Criciúma Esporte Clube,104652,0,59
+B,Cuiabá Esporte Clube SAF,104649,0,48
+B,Esporte Clube Juventude,5137,1,66
+B,Fortaleza,5143,1,61
+B,Goiás Esporte Clube,1933,1,47
+B,Grêmio Novorizontino SAF,101712,0,51
+B,Londrina,109673,0,56
+B,Operário Ferroviário Esporte Clube,5433,1,45
+B,Ponte Preta,104674,0,50
+B,Sport Club do Recife,104676,0,54
+B,São Bernardo,104019,0,39
+B,Vila Nova Futebol Clube,98499,0,41
+C,ABC Futebol Clube,98492,0,31
+C,Amazonas,5909,1,33
+C,Anápolis Futebol Clube,104556,0,25
+C,Associação Desportiva Confiança SAF,104576,0,26
+C,Botafogo Futebol Clube SAF (PB),104563,0,31
+C,Brusque,104571,0,24
+C,Caxias,104567,0,20
+C,Centro Sportivo Alagoano,98494,0,31
+C,Ferroviária,5573,1,41
+C,Figueirense,104572,0,51
+C,Floresta Esporte Clube,101728,0,22
+C,Guarani Futebol Clube,104669,0,37
+C,Itabaiana,104577,0,25
+C,Ituano Futebol Clube,98495,0,51
+C,Maringá,101713,0,23
+C,Paysandu Sport Club,104673,0,23
+C,Retrô,101739,0,32
+C,Tombense Futebol Clube,104647,0,23
+C,Volta Redonda,5148,1,23
+C,Ypiranga Futebol Clube (RS),104651,0,24
+D,ASA,104553,0,27
+D,América de Natal,98491,0,33
+D,Aparecidense,104650,0,16
+D,Associação Atlética de Altos,101729,0,23
+D,Atlético Monte Azul,104648,0,17
+D,Azuriz Futebol Clube,101740,0,22
+D,Barcelona de Ilhéus,102001,0,20
+D,Barra Futebol Clube (SC),101722,0,46
+D,Boavista Sport Club SAF,104608,0,26
+D,Capital Clube de Futebol Ltda,101694,0,25
+D,Ceilândia Esporte Clube,104640,0,26
+D,Central Sport Club,104565,0,1
+D,Cianorte,104646,0,30
+D,Club Sportivo Sergipe,104575,0,29
+D,Esporte Clube São José (RS),104568,0,24
+D,Esporte Clube São Luiz,104569,0,19
+D,Esporte Clube Água Santa,101721,0,33
+D,Ferroviário Atlético Clube SAF (CE),104554,0,17
+D,Futebol Clube Cascavel,101707,0,28
+D,Gazin Porto Velho,101737,0,24
+D,Goiatuba Esporte Clube,104559,0,17
+D,Goiânia Esporte Clube,104558,0,2
+D,Grêmio Atlético Sampaio,104570,0,10
+D,Grêmio Esportivo Brasil,104566,0,3
+D,Guarany Futebol Clube,100019,0,22
+D,Horizonte Futebol Clube,101699,0,5
+D,Iguatu,101718,0,12
+D,Imperatriz,104560,0,21
+D,Independência,98432,0,12
+D,Inter de Limeira,98434,0,29
+D,Itabirito,102769,0,18
+D,Jequié,104645,0,20
+D,Joinville Esporte Clube,104573,0,35
+D,Juazeirense,101708,0,23
+D,Lagarto Futebol Clube,101709,0,21
+D,Luverdense Esporte Clube,109655,0,21
+D,Manauara Esporte Clube,102309,0,23
+D,Manaus Futebol Clube,101723,0,27
+D,Maracanã Esporte Clube,101706,0,18
+D,Maranhão Atlético Clube,104561,0,25
+D,Marcílio Dias,104574,0,21
+D,Maricá Futebol Clube,101734,0,29
+D,Mixto Esporte Clube,104615,0,20
+D,Nova Iguaçu,104641,0,24
+D,Operário Futebol Clube (MS),98500,0,23
+D,Parnahyba Sport Club,104642,0,13
+D,Porto Vitória,102007,0,29
+D,Portuguesa,104675,0,22
+D,Pouso Alegre,101736,0,28
+D,Rio Branco Atlético Clube SAF,104555,0,25
+D,Sampaio Corrêa,98496,0,18
+D,Santa Cruz,98497,0,29
+D,Santa Cruz de Natal,101730,0,20
+D,Sousa Esporte Clube,104614,0,30
+D,Sport Club Penedense,104613,0,20
+D,Sport Clube Humaitá,101731,0,12
+D,Tocantinópolis,104578,0,21
+D,Trem Desportivo Clube,104644,0,23
+D,Treze Futebol Clube,104564,0,29
+D,Tuna Luso Brasileira,98498,0,27
+D,Uberlândia,104562,0,32
+D,União Atlético Clube (TO),104643,0,10
+D,Águia de Marabá,104607,0,18
