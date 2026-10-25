@@ -345,6 +345,8 @@ class Janela(QMainWindow):
         p = "%d x %d" % (m["gc"], m["gf"])
         if m.get("pen"):
             p += " (pên. %s)" % self.c.nome(m["pen"])
+        elif m["gc"] == m["gf"] and m.get("vantagem"):
+            p += " (empate classifica %s)" % self.c.nome(m["vantagem"])
         return p
 
     # ---- Tabelas ----

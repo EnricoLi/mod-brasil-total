@@ -243,6 +243,7 @@ class Carreira:
                 mudou = True
                 continue
             if all(self.partida(p)["gc"] is not None for p in f["partidas"]):
+                self._noticia_confronto(c, f)
                 prox = getattr(self, "_depois_" + cid.replace("-", "_"))(c, k)
                 if prox is None:
                     mudou = True
@@ -250,6 +251,25 @@ class Carreira:
                     c["fases"].append(prox)
                     mudou = True
         return mudou
+
+    def _noticia_confronto(self, c, f):
+        """a notícia do confronto do seu clube num mata-mata que acabou de terminar"""
+        meu = self.e["clube"]
+        for conf in f.get("confrontos") or []:
+            jogos = [self.partida(p) for p in conf]
+            if meu not in (jogos[0]["casa"], jogos[0]["fora"]):
+                continue
+            w = motor.vencedor_confronto(jogos)
+            outro = jogos[0]["fora"] if jogos[0]["casa"] == meu else jogos[0]["casa"]
+            como = ""
+            if jogos[-1].get("pen"):
+                como = " nos pênaltis"
+            elif jogos[0].get("vantagem") and jogos[0]["gc"] == jogos[0]["gf"]:
+                como = " com a vantagem do empate"
+            if w == meu:
+                self.noticia("%s: você passou por %s%s." % (c["nome"] + ", " + f["nome"], self.nome(outro), como))
+            else:
+                self.noticia("%s: você foi eliminado por %s%s." % (c["nome"] + ", " + f["nome"], self.nome(outro), como))
 
     def vencedores(self, f):
         ws = []
