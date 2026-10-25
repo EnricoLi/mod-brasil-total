@@ -1,0 +1,322 @@
+# Experimental modules
+
+Everything in this folder does something the modules one level up do not, and **most of it
+has been checked only by us and a handful of testers** (above all **vmardonesdev**, whose
+reports on the continental and region modules are behind several fixes here; see
+[the credits](../../README.md#the-people-who-made-this-better)). They are here because
+the fastest way to find out whether they work is for more than one person to run them. They
+were built and verified against the exe between 2026-09-21 and 2026-09-26. Most were watched
+working in a running game, and the season-end group (`fl26augseason`, `fl26seasonend`,
+`fl26chain`, with `fl26hdr192`) has now been played through a July rollover and on past the
+New Year after it. The menu modules have not been through a season.
+
+Install them exactly like the others (copy into `SiderAddons\modules\`, add a
+`lua.module = "..."` line), **one at a time**, and read `sider.log` afterwards. Every one of
+them reads the bytes it is about to change first and writes nothing at all if a single site
+disagrees, so the worst case is a log line saying it found something else and a game that
+runs exactly as it did before.
+
+**0.2.2: the raised limits.** Mod Studio 0.2.2's pack ships `fl26hdr255` (255 competitions a
+season, in place of `fl26hdr127`/`fl26hdr192`), `fl26reg128` (in place of `fl26reg64`),
+`fl26slots250`, `fl26slot7`, `fl26regs600`, `fl26appcap`, `fl26walk` and `fl26compcache` from this folder, with
+the 0.2.2 `fl26caps.lua` (2,400 clubs, 61,905 players). They are played on our 86-league test
+world; take them from the pack (Build installs them), not one by one from here, since they
+expect each other. The sections below on `fl26hdr192` and `fl26reg64` describe the older set.
+
+## What is here
+
+| file | what it changes | the risk |
+|---|---|---|
+| `fl26hdr192.lua` | the season's competition header from 100 to **192** entries, instead of the 127 that `fl26hdr127.lua` gives | 192 needs a redirect at each of thirteen bounds rather than a single byte; the stubs go into the spare tail of the code section, where the null guards also live |
+| `fl26comptab.lua` | the **Select Team** list, so leagues that had no slot in it become selectable, and rows that inherited a shipped competition's name stop displaying it. It also draws **each added league's country flag** next to it (Stagnant09's hook, issue #11) | it hands out free slots in a table the menu reads; if your install's table differs it aborts and says which slot disagreed. For the flags it hooks the game's slot-to-country lookup (`0x140c950d0`) with a table of its own; a slot without an entry gets the game's usual answer. `ID_COUNTRY` is filled in by `tools/mkflags.py` |
+| `fl26slotnames.lua` | the **section heading** seven of those slots draw, which is hard-coded in the exe ("Classic Teams" over a league of yours) | it points seven slots at the switch's empty case, so the menu falls back to the competition's own name, and to the original heading when your world has no competition on that slot. The default list is safe in any world |
+| `fl26clubs.lua` + `fl26clubs.dll` | the **club list** the Select Team screen shows for nine slots where the game builds the wrong one (national teams, classic teams, foreign clubs, or nothing at all) | it replaces two functions that read those lists and answers from the league's own rulebook instead, and a slot it cannot answer for falls back to the game's own answer. Since 2026-09-26 it also stops new leagues' clubs from landing in the Copa Libertadores / Club World Cup filler pools when a Master League is created (issue #8): the loader changes three bytes of the game's slot switch (slots 28, 71, 74) and the DLL leaves our clubs out of pool slots 69/73/75 for that one step. Only careers created after the update get it. Since Mod Studio 0.1.4 the world file's `nopool` line names clubs of the game that play in one of the world's leagues; the DLL leaves them out of the "other clubs" pools too |
+| `fl26rank.lua` | the **league rank** (first division, second, third) from a 2-bit field to a 3-bit one, so a pyramid can be more than three deep and the game can tell D3, D4 and D5 apart | 147 sites, every one an in-place rewrite of the same length; it moves the field into a bit the shipped loader never sets, and the group count keeps five bits (31 groups) |
+| `fl26deeprank.lua` | the **relegation gate**, so a club goes down from any division, not only the second | replaces `fl26deep4.lua`; load it AFTER `fl26rank.lua` and turn `fl26deep4.lua` off, or the bytes will not match |
+| `fl26deep4.lua` | one byte, so that a **third** division relegates into a fourth | superseded by `fl26rank` + `fl26deeprank`, which do it properly; kept for anyone who wants the one-byte version without the rank change |
+| `fl26reg64.lua` | the number of **regions** (countries the menus group by) from 29 to **64** | one instruction: the shipped code masks the region to five bits and throws away anything from 29 up, while the runtime field it feeds is six bits wide. Every shipped row keeps the region it had. Two more patches keep a region-29 league in a new Master League career (the career builder had a dead "skip region 29" test) |
+| `fl26reg128.lua` | the number of **regions** from 64 to **128** (ids 0..127). **Replaces `fl26reg64.lua`**: load one or the other | 44 in-place patches. The game keeps the region in a 6-bit field; the module moves the full region into a byte of the same record that the game writes and never reads (`+0x2fe`, marked by `0x5a` at `+0x2ff`), rewrites the one setter and all 32 readers to use it, and keeps `min(region, 63)` in the old field. In the file the seventh bit is bit 1 of `Competition.bin +3`, which was zero in every row ever written, so a world that never uses a region of 64 or more reads exactly as before. All or nothing: if any of the 44 sites holds unexpected bytes, nothing is written. Careers saved before it need the updated `fl26join.dll` (`fl26_join_regions`), which gives their records the region back on load. |
+| `fl26augseason.lua` | a Master League career in one of the added leagues **starts in August** (day 212) instead of 1 January | one jump: the lookup that picks the season type knows only the shipped regions 2..28, and a region of 29 or more fell through to "calendar year". Needs `fl26reg64.lua` (a league only reaches region 29+ with it). **Known side effect:** in an August-start career the Champions League play-off is registered after its own two dates, so on its own it gets no matches and the European competitions never start. With `fl26swiss` installed the DLL runs the play-off itself and all three competitions start (measured 2026-09-24) |
+| `fl26superguard.lua` | the **UEFA Super Cup setup** no longer crashes when the Champions League or Europa League entry it looks for is missing | one bounds check. When an entry is missing, that season has no Super Cup instead of a crash. Seen in an August-start career without `fl26swiss`; the play-off problem above is the likely cause. With `fl26swiss` the Super Cup was set up normally in the first and the third season of a run on 2026-09-25. Keep the guard installed anyway |
+| `fl26resultsguard.lua` | the **matchday-results screen** after *Skip Match* no longer ends the game when it has nothing to list | two jumps into the function's own exit, used only when its list is empty; the page then stays empty. Without it, the day of the first leg of the Europa and Conference League play-offs (with `fl26swiss`, around 18 February) crashed twice here in a row, in `ucrtbase.dll` at offset `0xa527e` (issue #9 hit the same at the Europa League knockout). With it, the career went on past that day on 2026-09-25 and both play-offs were played to the end. Why the screen gets an empty list on that day is still open |
+| `fl26seasonend.lua` | the **end-of-season filter**: the French and Italian leagues take part in the European season end (so a league below Ligue 2 or Serie B can go up and down), and one league without a final table no longer stops promotion for its whole group | two redirects. Works with the updated `fl26join.dll`, which it leaves the final say to; without the DLL it drops only the league that cannot be moved |
+| `fl26chain.lua` + `fl26chain.dll` | **promotion and relegation through three or more divisions**. The game exchanges clubs only across every other joint of a chain; the DLL completes the joints it skips, using the game's own standings and its own list writer | its `CHAINS` and `PROTECT` lists are **our** world's league ids and must be replaced with yours; the promote/demote counts must match the `COUNTS` table in `fl26comptab.lua`. Measured: the French and Italian chains moved 3 up and 3 down at every joint at the 2026-09-23 rollover, and on 2026-09-24 all five chains of the league-size world (the fifth is Championship -> an added England D3) did the same. Up to 8 chains. With a world file it also keeps a country's cup to its top flight when a new second division sits under it, or gives the cup both divisions when the line says `cupall=1` (Mod Studio 0.1.4, issue #32) |
+| `fl26swiss.lua` + `fl26swiss.dll` | the **2024 European format**: the Champions League, Europa League and a new Conference League each play one league phase of 36 clubs (8 opponents each in the first two, 6 in the Conference League), then a knockout play-off for places 9-24, then a fixed bracket from the round of 16 to the final. It also fills all three from a **UEFA access list** (which league position goes where, 36 clubs per competition) and dates leagues of 10 to 24 clubs over the whole season | it replaces the game's schedule builder for the listed regulations only and runs the game's own code for everything else. Needs a world built with the European tools (see *The European format and league sizes* below). Its regulation ids are our world's and are written in the source; its access list names only the shipped leagues |
+| `fl26ctlguard.lua` | after a **club change in Master League** (a sacking and a new job), the old club is handed back to the computer | the club change sometimes leaves the old club marked as played by you: the hub then shows its fixtures, Skip Match lists its results and the save list names the career after it. The guard puts the old club back to the computer whatever path the change took; it touches only the byte that says who plays a club |
+| `fl26catlist.lua` | **Database -> Competition Info** lists the countries of the added leagues, each under its own country's name (Croatia, Serbia, Norway ...), instead of leaving them out | it copies the game's list of 28 regions and appends 29..63, and answers "which country is this region" for the regions in its `COUNTRY` table. That same answer is also asked by the end-of-season code that hands out European places, so the added leagues are now treated there as the shipped leagues are. The flags on that screen are still borrowed from other countries |
+| `fl26appcap.lua` | the **PlayerAppearance table** from 30,024 to **65,000** records, so a database with more appearance records than that keeps every player's look (past 30,023 they drew the default look) | 37 in-place rewrites of one 32-bit field each (object size, the backup copy's chunk count, the two counts behind the table, the cap). Generated and checked by `tools/appcap.py` (refuses if any reference to the object is left over) and run on the exe's own code by `tools/appemu.py` (60,000-record load, lookups, insert, remove, backup/restore). Load it right after `fl26caps.lua` and **before** `fl26regen.lua`, which reads the cap from the code; loaded after it, it refuses and changes nothing. In the 0.2.2 pack, played on our test world |
+| `fl26hdr255.lua` | the season's competition header from 100 to **255** entries (0.2.2). **Replaces `fl26hdr127.lua` and `fl26hdr192.lua`** | 45 patches; the extra header entries are paid for out of the per-phase standings tables (600 -> 595). A season already on disk keeps the width it was created with |
+| `fl26slots250.lua` | **competition slots** (Select Team, club lists) from 123 to **250**, so leagues past the game's free ids get a slot of their own | 35 patches; every slot gets a capacity of its own, in a table on a page the module allocates. Needs `fl26slot7.lua` for Master League |
+| `fl26slot7.lua` | a club's Master League **league slot** becomes a whole byte (0..249) instead of 7 bits | 59 patches; the game's flag in that byte moves to padding beside it. Without it a club of a league on slot 130 got slot 2 when a career was created |
+| `fl26regs600.lua` | the game's **regulation recount** looks at all 600 records instead of 300 | 4 patches; without it the highest regulation ids (late cup and European ties) were left out of the Master League save once a world had more than 300 |
+| `fl26walk.lua` + `fl26walk.dll` | **faster Master League creation** and day advance with a club of an added league | speed fix, not a capacity patch: the DLL remembers the user's club and league for the length of one calendar walk (a career with a Druga NL club sat 113 s on the loading screen before it) |
+| `fl26compcache.lua` + `fl26compcache.dll` | **no 20-40 minute loading screen at the end of January** in a big world | speed fix, not a capacity patch: on the winter transfer deadline the game scores every player's club against every league, asking the same competition lookup again for each of 61,905 players. The DLL keeps each competition's answer for the length of one scan (each scan 0.1-0.2 s after, the test world went from day 30 to day 51 in one move; before, 20-36 minutes on day 30). `fl26compcache.log` beside the dll times every scan |
+| `fl26editlist.lua` | **Edit mode's team lists** (Edit > Teams, Edit > Players > Edit Player, Transfer, Managers) show every added league with its clubs, so their clubs and players can be edited there like shipped ones | those lists do not come from the data at all: one function in the exe hands every Edit screen the same thirty competition slots, written into its code. The module adds the slots of your leagues to what it returns (read from the table `fl26comptab.lua` sets up, so load it after that) and changes nothing else. Checked in game 2026-09-26: every added league of our world listed and openable (32 were missing without it). Side effect: the "Other" heading (free agents, created players) is no longer the last one; it now sits just before the block of added leagues |
+
+## Order, and which of these need each other
+
+They are not independent. This is the order they were run in here. Keep each note on a line
+of its own, as below: Sider does not take a comment after a `lua.module` value on the same
+line.
+
+```ini
+; first: it prints "id N -> row R slot S" for every league
+lua.module = "fl26comptab.lua"
+; the default slot list works in any world
+lua.module = "fl26slotnames.lua"
+; its defaults work in any world too
+lua.module = "fl26clubs.lua"
+lua.module = "fl26rank.lua"
+; after rank, and with fl26deep4 off
+lua.module = "fl26deeprank.lua"
+; or fl26reg64.lua (64 regions), never both
+lua.module = "fl26reg128.lua"
+; needs reg128 (or reg64)
+lua.module = "fl26augseason.lua"
+lua.module = "fl26superguard.lua"
+lua.module = "fl26resultsguard.lua"
+; after a club change, the old club goes back to the computer
+lua.module = "fl26ctlguard.lua"
+lua.module = "fl26seasonend.lua"
+; after comptab (the counts must agree)
+lua.module = "fl26chain.lua"
+; after reg128
+lua.module = "fl26catlist.lua"
+; after comptab
+lua.module = "fl26editlist.lua"
+lua.module = "fl26swiss.lua"
+```
+
+`fl26hdr192.lua` goes where `fl26hdr127.lua` was, after `fl26joindll.lua`.
+
+**Use `fl26hdr192.lua` *instead of* `fl26hdr127.lua`, never both.** They patch the same
+thirteen places, so whichever runs second will find bytes it does not recognise and abort.
+A season already on disk was built against whatever header width was installed when it was
+created. Switching between 127 and 192 means starting a new season.
+
+## Lists you must edit for your own world
+
+**With FL26 Mod Studio you edit none of them.** Its League Builder writes a world file,
+`SiderAddons\modules\fl26world.txt`, and `fl26joindll`, `fl26comptab`, `fl26slotnames`,
+`fl26clubs`, `fl26editlist`, `fl26catlist`, `fl26chain` and `fl26swiss` take their leagues,
+slots, countries, chains, sizes and European places from it. A module that finds no world file
+keeps the built-in lists below, exactly as before. The format is in
+[docs/developers/mod-studio.md](../../docs/developers/mod-studio.md#the-world-file-sideraddonsmodulesfl26worldtxt).
+The rest of this section is for worlds built by hand with the scripts.
+
+Besides the two `SLOTS` tables described below: `COUNTS` in `fl26comptab.lua` (how many clubs each of your leagues
+promotes and relegates), `CHAINS` / `PROTECT` in `fl26chain.lua`, `REGS` and `UECL` in
+`fl26swiss.lua`, `COUNTRY` in `fl26catlist.lua` and `OUR_IDS` in `fl26editlist.lua` (the same
+list as `OUR_IDS` in `fl26comptab.lua`). All of them ship with our test world's ids.
+`COUNTRY` in `fl26catlist.lua` and `ID_COUNTRY` in `fl26comptab.lua` you do not edit by hand:
+`python tools\mkflags.py --root <your root> --base <pesdb dir> --write` fills both from your world
+(it prints every league and the country it chose; a `--countries` file settles the ones it cannot
+read off the name).
+The `ACCESS` list in `tools/native/fl26swiss.c` names only the shipped leagues, so it fits
+any world; add your own leagues to it (and rebuild the DLL) if they should play in Europe.
+
+`fl26clubs.lua` carries a `SLOTS` table near the top, and the numbers in it are the slots
+**our** test world happened to land on. (`fl26slotnames.lua` has one too, but since
+2026-09-25 you can leave it as it is: a slot with no league of yours on it keeps its
+original heading.) A competition slot is
+not a property of your league; it is handed out by `fl26comptab.lua` at boot, and it says so
+in `sider.log`:
+
+```
+[fl26comptab.lua] fl26comptab:   id 180 -> row 179 slot  75
+```
+
+Read the slot of each of your leagues from those lines and put those numbers in. **Never
+guess a slot.** `fl26slotnames.lua` names, for each slot, the case byte it expects to find
+and the heading that case draws today — if your install disagrees it changes nothing and
+logs what it saw, which is the report we want.
+
+## What `fl26rank.lua` and `fl26reg64.lua` / `fl26reg128.lua` are for
+
+**Rank.** Every rulebook carries its place in the national pyramid, and the game keeps it in
+two bits, which count to three. Build a fourth and a fifth division and all of D3, D4 and D5
+carry the value 3; the League Info panel then shows France D4 as its own lower league, and
+the end-of-season mover cannot tell which way anybody goes. `fl26rank.lua` moves the field
+down one bit so it counts to seven. If you have already built a deep pyramid, renumber it
+with `python tools\deepen.py --root <your root> --retier <top league ids>` — without that
+the leagues still all read 3, because that is what is stored in the file.
+
+**Regions.** A region is the country a competition is grouped under in the menus. The
+shipped parser throws away any region of 29 or more, although the runtime field is six bits
+and holds 64. `fl26reg64.lua` rewrites that one instruction. **The caveat that matters:**
+the menu's *heading* for a region comes from a separate table of 24 rows, and a region with
+no row there does not draw a blank — it draws the heading of whatever country was looked up
+before it. So regions 29 and up work as groupings and borrow a name. The module that gives
+them headings of their own copies the game's own rows, and the version that exists carries
+those rows inside itself as a blob of shipped bytes; this repository does not redistribute
+game data, so it will be published once it copies them out of memory at startup instead.
+
+## `fl26reg128.lua`: 128 regions
+
+```ini
+; in place of lua.module = "fl26reg64.lua", same position (before fl26augseason and fl26catlist)
+lua.module = "fl26reg128.lua"
+```
+
+Files for `SiderAddons\modules`: `fl26reg128.lua`, and the updated `fl26catlist.lua`,
+`fl26augseason.lua`, `fl26joindll.lua` + `fl26join.dll` and `fl26swiss.dll`, which all
+accept regions up to 127 now. Mod Studio's pack ships `fl26reg128` instead of `fl26reg64` and
+switches the old line off (`retired.txt`).
+
+Why 64 stopped it: `fl26reg64` widened the parser to six bits, and the runtime field is six
+bits. The record has a 16-bit word at `+0x2fe` that the game writes (from nine bits of the
+competition row it never uses, and as `0xffff` on reset) but that a scan of the whole exe
+finds no reader for. The module makes the region setter store the full region in its low
+byte and `min(region, 63)` in the old field, the parser mark the high byte with `0x5a`, turns
+every one of the 32 reads of the old field into a read of that byte (same length), and
+makes the resets clear the word. The
+three dead "region 29" tests the stock parser had hidden now compare with 0. Every patch was
+checked against the exe on disk, and no branch or table in the exe lands inside a replaced
+range.
+
+In `Competition.bin +3` the region is: bits 3..7 = region bits 0..4, bit 0 = bit 5 (as with
+`fl26reg64`), bit 1 = bit 6. `tools/mkleague.py` (`enc_region` / `dec_region`) writes it, and
+`tools/test_region_enc.py` checks the round trip. A world built for 64 regions needs no
+rebuild.
+
+Old careers: a save made before the module has junk in that word and never the mark.
+`fl26join.dll` hooks the game's recount of the career records (run on load and after every
+write-back) and gives each unmarked record its 6-bit value, which is the whole region an old
+career had (region 63 included), and the mark. Without the updated DLL an old career shows wrong regions in
+its menus. New careers do not need it.
+
+Not checked in a game yet: everything above is static analysis. To report: the line
+`fl26reg128: 44 of 44 sites rewritten` in sider.log, a league on region 64 or more in
+Select Team and Competition Info, and an old career loaded with the log line `regions: N
+regulation record(s) of an old career given their region`.
+
+## The European format and league sizes (`fl26swiss`)
+
+This is the newest part (2026-09-24) and the one with the most moving pieces, so here is the
+whole route and exactly what has been seen working.
+
+**What you get.** The Champions League and the Europa League keep their shipped competition
+ids, but their group stage becomes one league phase of 36 clubs. A new competition, the
+Conference League, is added the same way. Each of the three then plays: a league phase (8
+opponents each, two from each pot of nine, over 16 matchdays; 6 opponents from six pots of
+six over 12 matchdays for the Conference League; since Mod Studio 0.1.4 the draw follows
+UEFA's rules: no club meets a club from its own country, and at most two of its opponents come
+from any one other country), a two-legged play-off between places 9-24,
+and a knockout from the round of 16 to the final whose bracket is fixed in advance. The
+added leagues get real sizes: 10 clubs playing four times (36 rounds), 12 playing three
+times (33), 16, 18, 22 and 24 clubs (46 rounds), next to the 20-club leagues.
+
+**Building the world.** Start from a world built as in [by-hand.md](../../docs/developers/by-hand.md#part-i-every-world-building-option),
+with its leagues spread one region per league (`tools/spreadregions.py --root <root> --plan own`,
+needs `fl26reg64.lua`). Then, each step writing a new livecpk root (`--out`) from the previous one:
+
+```
+python tools\mkreshape.py --base <root>\common\etc\pesdb --out <root2> ^
+       --reshape UEFA_CHAMPIONS_LEAGUE:2:groups:36:1:- --reshape UEFA_EUROPE_LEAGUE:1:groups:36:1:-
+python tools\mkuecl.py   --src <root2> --out <root3>
+python tools\mkeuropo.py --src <root3> --out <root4>
+python tools\mksizes.py  --src <root4> --out <root5> --plan sizes.json
+python tools\deepen.py --root <root5> --league 174 --below 79  --deep-rank --top
+python tools\deepen.py --root <root5> --league 176 --below 174 --deep-rank
+python tools\deepen.py --root <root5> --league 179 --below 96  --deep-rank --top
+```
+
+With those three lines in, add `{ 79, 174, 3, 3 }` to `CHAINS` in `fl26chain.lua` (the
+comment above that table says why only then).
+
+`mkreshape.py` copies only the three competition tables, so copy the rest of the world into
+`<root2>` first. **Do not skip `mkeuropo.py`**: it adds the Europa League and Conference League
+play-offs for places 9-24 (regulations 188 and 189). Without them the DLL now logs
+`this world has no regulation 188` and leaves the step after the league phase to the game.
+Until 2026-09-26 it did not notice they were missing, ran the Europa League play-off into
+nothing (`into reg 188 (0 clubs)`) and the results screen crashed on the play-off day
+(issue #9). `mkeuropo.py` also used to insist that the Conference League was competition 174,
+which it only is in a world with added leagues; it now finds it through regulation 186. `mkuecl.py` prints a `local UECL = { ... }` line; put it into
+`fl26swiss.lua`. The last three lines are our world's choices (two 24-club divisions under the
+Championship, a 22-club second division under reg 96); leave them out if you do not want them,
+and write `sizes.json` for your own leagues (one line per league: club count and how many
+times the clubs meet; the format is at the top of `tools/mksizes.py`).
+
+**This modifies two shipped competitions.** The Champions League and Europa League rows in
+your own livecpk copy are changed, and the 18 shipped group rows that a 36-club single group
+no longer needs are dropped. Nothing in the game's own files is touched; removing the root
+undoes it.
+
+**Measured in the game (2026-09-24, one world, one career in an added league):**
+
+- all three league phases filled with 36 clubs and played; the Champions League
+  quarter-finals follow the bracket (the shipped code draws them at random, which the DLL
+  undoes, logging `quarter-finals put back in bracket order`);
+- a first season played from August past the end of May with no stall, and the five
+  promotion chains moving 3 up and 3 down at the rollover;
+- the second season: every league size given the right number of rounds (10 clubs x 4 = 36,
+  12 x 3 = 33, 12 x 4 = 44, 22 x 2 = 42, 24 x 2 = 46), and the August draw filling all three
+  competitions from the final tables of the season before:
+  `access -- 36/36/36 (108 positions from last season's tables, 0 from first-season order, 0 missing)`;
+- **Database -> Competition Info** (fixed late on 2026-09-24): the Europa League and the
+  Conference League now show their 36-club league-phase table under *Group stage*, as the
+  Champions League does. Before, the item was greyed out for both all autumn, and opening
+  *Knockout Phase* before the knockout draw crashed the game, for all three competitions.
+  That item is now left out of the menu until the knockout phase is under way. The sider.log
+  lines are `knockout item guard live` and `group stage item live`.
+  Update 2026-09-25: the play-off for places 9-24 used to appear as *W-L Table*. It is now
+  called *Play-offs*, stays grey until the play-off is drawn (the Conference League draw comes
+  in December, the Europa League one in February), and then shows the ties. The page heading
+  still reads *Group stage - Matchday ...*; that is the game's own heading and harmless. The
+  extra sider.log line is `play-off names live`.
+  Update 2026-10-11 (not yet checked in the game): each qualifying round (2nd, 3rd, play-off
+  round) gets its own item once its ties hold clubs; from late January the play-off item reads
+  *Knockout round play-offs*; the knockout list reads *Round of 16* instead of *Round of 32* /
+  *First knockout round*; the Conference League and world-built continental cups show the
+  same list as the Champions League instead of a bracket. sider.log lines:
+  `Competition Info knockouts as a list live`, `Round of 16 names live`,
+  `Competition Info item per qualifying round live`.
+
+**What is not right yet, plainly:**
+
+- The final tables the access list reads are kept **in the DLL's memory**, captured at the
+  summer rollover (around day 176). If the game is restarted between then and the August draw
+  (around day 244), they are gone and the draw falls back to squad strength. In the first
+  season there are no final tables yet, so each league is ordered by squad strength (the
+  eleven best players by their ratings); `sider.log` shows `first season -- reg ... by squad
+  strength`. To choose the first-season field yourself, put `fl26swiss-first.txt` in
+  `modules` (format in [by-hand.md, D6](../../docs/developers/by-hand.md#d6-play-and-check)).
+- The Conference League play-off is drawn in December, straight after its league phase
+  (the real draw is at the end of January), and played in February with the Europa League's.
+- The Conference League's league phase is **six** matches a club (six opponents, one from each
+  pot), as in the real competition, spread over twelve dates. A table where every club has
+  played 6 is finished, not stalled.
+- The European dates are UEFA's and the DLL does not check them against the domestic
+  calendars. A tester saw Manchester United with a Champions League match and a Premier League
+  match both on 21 January (issue #9). When that day is simulated both are played, but the
+  next-match screen shows only one of them.
+- The access list names only the shipped leagues (since 2026-09-26). Until then it also
+  named our world's new leagues by regulation id, and a world whose leagues landed on the
+  same ids sent them to Europe as those countries (issue #8). New leagues get no European
+  places unless you add them to `ACCESS` in `tools/native/fl26swiss.c`; the places left open
+  are topped up from the big five.
+- The title holders come first in the list: the Champions League and Europa League winners
+  (knockout regulations 4 and 6, the two the UEFA Super Cup takes) to the next Champions
+  League, the Conference League winner (187) to the next Europa League. Their winners are kept
+  at the July teardown, like a domestic cup's.
+- The regulation ids and the size plan are our world's. A world built with the same tools
+  and defaults gets the same ids; anything else needs them edited.
+- The game crashes now and then in its own protected code (see
+  [known-issues](../../docs/known-issues.md)); on 2026-09-24 that was five times in about
+  four hours of simulated play. Save often.
+
+## What to report, for any of them
+
+The `sider.log` lines the module wrote, what you expected to see in the game, and what you
+saw instead. A module that refuses its patches is not a disaster and is still worth
+reporting — the lines it writes name the addresses, which is exactly what is needed to find
+out how your build differs. For the four that change menus (`comptab`, `slotnames`,
+`clubs`, `reg64`), a screenshot of the screen that is wrong is worth more than a
+description of it.
+
+The compiled `fl26clubs.dll`, `fl26chain.dll` and `fl26swiss.dll` are built from
+`tools/native/fl26clubs.c`, `tools/native/fl26chain.c` and `tools/native/fl26swiss.c`; their checksums and the build lines are in [tools/native/README.md](../../tools/native/README.md).
+
+Mod Studio (0.2.0 and later) installs `fl26superguard.lua`, `fl26resultsguard.lua` and
+`fl26ctlguard.lua` as one bundle, `fl26lateguards.lua`, and switches the single lines off. By
+hand, use the single files or the bundle, not both.
