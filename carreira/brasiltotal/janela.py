@@ -1,7 +1,7 @@
 """A janela do programa: a carreira, os jogos que você joga no PES e o resto simulado."""
 import datetime, json, os, sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QColor
 from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFrame, QGridLayout,
                                QHBoxLayout, QHeaderView, QLabel, QListWidget, QMainWindow, QMessageBox,
@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBo
                                QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from .carreira import Carreira, NOMES, SERIES
-from . import motor
+from . import motor, pes
 
 ESTILO = """
 QWidget { background: #14171c; color: #e6e6e6; font-size: 14px; }
@@ -210,8 +210,14 @@ class Janela(QMainWindow):
         self.i_pen = QComboBox()
         g.addWidget(self.i_lpen, 5, 0)
         g.addWidget(self.i_pen, 5, 1, 1, 2)
+        self.i_pes = QLabel()
+        self.i_pes.setObjectName("sub")
+        g.addWidget(self.i_pes, 3, 2, 2, 2)
+        self.relogio = QTimer(self)
+        self.relogio.timeout.connect(self._ler_pes)
+        self.relogio.start(1500)
         bl = QHBoxLayout()
-        self.i_conf = QPushButton("Confirmar placar do PES")
+        self.i_conf = QPushButton("Confirmar placar")
         self.i_conf.setObjectName("principal")
         self.i_conf.clicked.connect(self.confirmar)
         self.i_sim = QPushButton("Simular este jogo")
@@ -259,8 +265,8 @@ class Janela(QMainWindow):
             self.i_comp.setText("%s · %s%s · %s" % (NOMES[prox["comp"]], f["nome"], extra, data_br(prox["data"])))
             self.i_jogo.setText("%s  x  %s" % (c.nome(prox["casa"]), c.nome(prox["fora"])))
             if jogar:
-                dica = ("No PES 2021: Amistoso (Exhibition), %s como mandante e %s como visitante. "
-                        "Jogue e digite o placar final aqui (sem os pênaltis)." % (c.nome(prox["casa"]), c.nome(prox["fora"])))
+                dica = ("No PES: Amistoso, %s como mandante e %s como visitante. O placar aparece aqui "
+                        "sozinho durante o jogo; no fim, confira e confirme." % (c.nome(prox["casa"]), c.nome(prox["fora"])))
                 if prox.get("vantagem"):
                     dica += " Empate classifica %s." % c.nome(prox["vantagem"])
                 self.i_info.setText(dica)
@@ -271,13 +277,36 @@ class Janela(QMainWindow):
                 self.i_pen.clear()
                 self.i_pen.addItem(c.nome(prox["casa"]), prox["casa"])
                 self.i_pen.addItem(c.nome(prox["fora"]), prox["fora"])
+                texto = "%s · %s%s" % (NOMES[prox["comp"]], f["nome"], extra)
+                pes.escrever_partida(pasta_dados(), prox, c.nome, texto,
+                                     prox.get("decide") and not prox.get("vantagem"))
+                self.i_pes.setText("Esperando o jogo no PES...")
+                self._lido = None
             else:
                 self.i_info.setText("Força: %s %.1f · %s %.1f" % (c.nome(prox["casa"]), c.forca(prox["casa"]),
                                                                   c.nome(prox["fora"]), c.forca(prox["fora"])))
+        if not jogar:
+            pes.apagar_partida(pasta_dados())
+            self.i_pes.setText("")
         self._pen_visivel()
         self.i_news.clear()
         for n in c.e["noticias"][:30]:
             self.i_news.addItem("%s  %s" % (data_br(n["data"])[4:], n["texto"]))
+
+    def _ler_pes(self):
+        """o placar que o módulo do PES gravou, posto nos campos do placar"""
+        m = self.pendente
+        if m is None:
+            return
+        lido = pes.ler_placar(pasta_dados(), m)
+        if lido is None or lido == getattr(self, "_lido", None):
+            return
+        self._lido = lido
+        gc, gf, minuto, _fim = lido
+        self.i_gc.setValue(gc)
+        self.i_gf.setValue(gf)
+        self.i_pes.setText("PES: %s %d x %d %s%s" % (self.c.nome(m["casa"]), gc, gf, self.c.nome(m["fora"]),
+                                                    (" · %s'" % minuto) if minuto else ""))
 
     def _pen_visivel(self):
         m = self.pendente
